@@ -9,6 +9,15 @@ import (
 	"github.com/calmh/syncthing/scanner"
 )
 
+// type-node-repo
+type keyprefix [1 + 1 + 64]byte
+
+func key(t uint, id uint, repo string, file string) []byte {
+	kp := keyprefix{byte(t), byte(id)}
+	copy(kp[2:], []byte(repo))
+	return append(kp[:], []byte(file)...)
+}
+
 /*
 Bolt DB structure:
 
