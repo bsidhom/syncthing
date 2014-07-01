@@ -9,6 +9,36 @@ import (
 	"github.com/calmh/syncthing/scanner"
 )
 
+const (
+	keyTypeNode = iota
+	keyTypeGlobal
+)
+
+type fileVersion struct {
+	version uint64
+	node    protocol.NodeID
+}
+
+/*
+
+keyTypeNode (1 byte)
+    repository (64 bytes)
+        node (32 bytes)
+            name (variable size)
+            	|
+            	scanner.File
+
+keyTypeGlobal (1 byte)
+	repository (64 bytes)
+		name (variable size)
+			|
+			[]fileVersion (sorted)
+
+Need: iterate over keyTypeGlobal/repository in lockstep with keyTypeNode/repository/node; get file if version differs
+Replace: iterate over keyTypeNode/repository/node in lockstep with new list, remove and update global as appropriate
+
+*/
+
 // type-node-repo
 type keyprefix [1 + 1 + 64]byte
 
