@@ -62,7 +62,7 @@ func (m *Set) Need(node protocol.NodeID) []scanner.File {
 	if debug {
 		l.Debugf("%s Need(%v)", m.repo, node)
 	}
-	return nil
+	return ldbNeed(m.db, []byte(m.repo), node[:])
 }
 
 func (m *Set) Have(node protocol.NodeID) []scanner.File {

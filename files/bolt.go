@@ -306,3 +306,54 @@ func ldbGlobal(db *leveldb.DB, repo []byte) []scanner.File {
 	}
 	return fs
 }
+
+func ldbNeed(db *leveldb.DB, repo, node []byte) []scanner.File {
+	start := globalKey(repo, nil)
+	limit := globalKey(repo, []byte{0xff, 0xff, 0xff, 0xff})
+	dbi := db.NewIterator(&util.Range{Start: start, Limit: limit}, nil)
+	var fs []scanner.File
+	for dbi.Next() {
+		var vl versionList
+		err := vl.UnmarshalXDR(dbi.Value())
+		if err != nil {
+			panic(err)
+		}
+		if len(vl.versions) == 0 {
+			l.Debugln(dbi.Key())
+			panic("no versions?")
+		}
+
+		have := false // If we have the file, any version
+		need := false // If we have a lower version of the file
+		for _, v := range vl.versions {
+			if bytes.Compare(v.node, node) == 0 {
+				// This node has a lower version of the file
+				have = true
+				need = v.version < vl.versions[0].version
+				break
+			}
+		}
+
+		if need {
+			fk := nodeKey(repo, vl.versions[0].node, globalKeyName(dbi.Key()))
+			bs, err := db.Get(fk, nil)
+			if err != nil {
+				panic(err)
+			}
+
+			var gf scanner.File
+			err = gf.UnmarshalXDR(bs)
+			if err != nil {
+				panic(err)
+			}
+
+			if protocol.IsDeleted(gf.Flags) && !have {
+				// We don't need deleted files that we don't have
+				continue
+			}
+
+			fs = append(fs, gf)
+		}
+	}
+	return fs
+}
