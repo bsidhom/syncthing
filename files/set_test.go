@@ -9,13 +9,12 @@ import (
 	"os"
 	"sort"
 	"testing"
-
-	"github.com/boltdb/bolt"
 	"github.com/calmh/syncthing/cid"
 	"github.com/calmh/syncthing/files"
 	"github.com/calmh/syncthing/lamport"
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -52,7 +51,7 @@ func (l fileList) Swap(a, b int) {
 
 func TestGlobalSet(t *testing.T) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +185,7 @@ func TestGlobalSet(t *testing.T) {
 
 func TestLocalDeleted(t *testing.T) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +262,7 @@ func TestLocalDeleted(t *testing.T) {
 
 func Benchmark10kReplace(b *testing.B) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -288,7 +287,7 @@ func Benchmark10kUpdateChg(b *testing.B) {
 	}
 
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -321,7 +320,7 @@ func Benchmark10kUpdateSme(b *testing.B) {
 	}
 
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -349,7 +348,7 @@ func Benchmark10kNeed2k(b *testing.B) {
 	}
 
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -384,7 +383,7 @@ func Benchmark10kHave(b *testing.B) {
 	}
 
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -419,7 +418,7 @@ func Benchmark10kGlobal(b *testing.B) {
 	}
 
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -449,7 +448,7 @@ func Benchmark10kGlobal(b *testing.B) {
 
 func TestGlobalReset(t *testing.T) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +491,7 @@ func TestGlobalReset(t *testing.T) {
 
 func TestNeed(t *testing.T) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +534,7 @@ func TestNeed(t *testing.T) {
 
 func TestChanges(t *testing.T) {
 	os.RemoveAll("testdata/index.db")
-	db, err := bolt.Open("testdata/index.db", 0660)
+	db, err := leveldb.OpenFile("testdata/index.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

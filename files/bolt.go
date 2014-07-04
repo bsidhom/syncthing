@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"sort"
 
+	"github.com/calmh/syncthing/lamport"
+	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -78,26 +81,47 @@ func keyName(key []byte) []byte {
 	return key[1+64+32:]
 }
 
-func ldbReplace(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
+func globalKeyName(key []byte) []byte {
+	return key[1+64:]
+}
+
+type deletionHandler func(db *leveldb.DB, repo, node, name []byte, dbi iterator.Iterator)
+
+func ldbGenericReplace(db *leveldb.DB, repo, node []byte, fs []scanner.File, deleteFn deletionHandler) {
 	sort.Sort(fileList(fs)) // sort list on name, same as on disk
 
 	start := nodeKey(repo, node, nil)                            // before all repo/node files
 	limit := nodeKey(repo, node, []byte{0xff, 0xff, 0xff, 0xff}) // after all repo/node files
 
 	dbi := db.NewIterator(&util.Range{Start: start, Limit: limit}, nil)
-	more := dbi.Next()
+	moreDb := dbi.Next()
 	fsi := 0
+	moreFs := fsi < len(fs)
 	var newName, oldName []byte
 	for {
-		cmp := -1
-		if more && fsi < len(fs) {
-			newName = []byte(fs[fsi].Name)
-			oldName = keyName(dbi.Key())
-			cmp = bytes.Compare(newName, oldName)
+		moreFs = fsi < len(fs)
+
+		if !moreDb && !moreFs {
+			break
 		}
+
+		if moreFs {
+			newName = []byte(fs[fsi].Name)
+		}
+
+		if moreDb {
+			oldName = keyName(dbi.Key())
+		}
+
+		cmp := bytes.Compare(newName, oldName)
+
+		l.Debugln(fsi, moreFs, moreDb, cmp, newName, oldName)
+
 		switch {
-		case cmp == -1:
+		case moreFs && (!moreDb || cmp == -1):
 			// Disk is missing this file. Insert it.
+			ldbInsert(db, repo, node, newName, fs[fsi])
+			ldbUpdateGlobal(db, repo, node, newName, fs[fsi].Version)
 			fsi++
 
 		case cmp == 0:
@@ -105,26 +129,107 @@ func ldbReplace(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
 			ldbUpdateGlobal(db, repo, node, newName, fs[fsi].Version)
 			// Iterate both sides.
 			fsi++
-			more = dbi.Next()
+			moreDb = dbi.Next()
 
-		case cmp == 1:
-			// Disk has files that we are missing. Remove it.
-			db.Delete(dbi.Key(), nil)
-			ldbRemoveFromGlobal(db, repo, node, oldName)
-			// Iterate db.
-			more = dbi.Next()
-		}
-		if !more && fsi == len(fs) {
-			break
+		case moreDb && (!moreFs || cmp == 1):
+			if deleteFn != nil {
+				deleteFn(db, repo, node, oldName, dbi)
+			}
+			moreDb = dbi.Next()
 		}
 	}
 	dbi.Release()
+}
+
+func ldbReplace(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
+	ldbGenericReplace(db, repo, node, fs, func(db *leveldb.DB, repo, node, name []byte, dbi iterator.Iterator) {
+		// Disk has files that we are missing. Remove it.
+		db.Delete(dbi.Key(), nil)
+		ldbRemoveFromGlobal(db, repo, node, name)
+	})
+}
+
+func ldbReplaceWithDelete(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
+	ldbGenericReplace(db, repo, node, fs, func(db *leveldb.DB, repo, node, name []byte, dbi iterator.Iterator) {
+		var f scanner.File
+		err := f.UnmarshalXDR(dbi.Value())
+		if err != nil {
+			panic(err)
+		}
+		f.Blocks = nil
+		f.Version = lamport.Default.Tick(f.Version)
+		f.Flags |= protocol.FlagDeleted
+		err = db.Put(dbi.Key(), f.MarshalXDR(), nil)
+		if err != nil {
+			panic(err)
+		}
+	})
+}
+
+func ldbUpdate(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
+	ldbGenericReplace(db, repo, node, fs, nil)
+}
+
+func ldbInsert(db *leveldb.DB, repo, node, name []byte, file scanner.File) {
+	l.Debugf("ldbInsert(%q, %q, %q, ...)", repo, node, name)
+	nk := nodeKey(repo, node, name)
+	err := db.Put(nk, file.MarshalXDR(), nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // ldbUpdateGlobal adds this node+version to the version list for the given
 // file. If the node is already present in the list, the version is updated.
 // If the file does not have an entry in the global list, it is created.
 func ldbUpdateGlobal(db *leveldb.DB, repo, node, file []byte, version uint64) {
+	gk := globalKey(repo, file)
+	svl, err := db.Get(gk, nil)
+	if err != nil && err != leveldb.ErrNotFound {
+		panic(err)
+	}
+
+	var fl versionList
+	nv := fileVersion{
+		node:    node,
+		version: version,
+	}
+	if svl != nil {
+		err = fl.UnmarshalXDR(svl)
+		if err != nil {
+			panic(err)
+		}
+
+		for i := range fl.versions {
+			if bytes.Compare(fl.versions[i].node, node) == 0 {
+				fl.versions = append(fl.versions[:i], fl.versions[i+1:]...)
+				break
+			}
+		}
+
+		for i := range fl.versions {
+			if fl.versions[i].version <= version {
+				t := append(fl.versions[:i], nv)
+				fl.versions = append(t, fl.versions[i:]...)
+				break
+			}
+		}
+	}
+
+	if len(fl.versions) == 0 {
+		fl.versions = []fileVersion{nv}
+	}
+
+	err = db.Put(gk, fl.MarshalXDR(), nil)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ldbRemoveFromGlobal removes the node from the global version list for the
+// given file. If the version list is empty after this, the file entry is
+// removed entirely.
+func ldbRemoveFromGlobal(db *leveldb.DB, repo, node, file []byte) {
 	gk := globalKey(repo, file)
 	svl, err := db.Get(gk, nil)
 	if err != nil {
@@ -139,25 +244,65 @@ func ldbUpdateGlobal(db *leveldb.DB, repo, node, file []byte, version uint64) {
 
 	for i := range fl.versions {
 		if bytes.Compare(fl.versions[i].node, node) == 0 {
-			fl.versions[i].version = version
-			goto save
+			fl.versions = append(fl.versions[:i], fl.versions[i+1:]...)
+			break
 		}
 	}
 
-	fl.versions = append(fl.versions, fileVersion{
-		node:    node,
-		version: version,
-	})
-
-save:
-	err = db.Put(gk, fl.MarshalXDR(), nil)
+	if len(fl.versions) == 0 {
+		err = db.Delete(gk, nil)
+	} else {
+		err = db.Put(gk, fl.MarshalXDR(), nil)
+	}
 	if err != nil {
 		panic(err)
 	}
 }
 
-// ldbRemoveFromGlobal removes the node from the global version list for the
-// given file. If the version list is empty after this, the file entry is
-// removed entirely.
-func ldbRemoveFromGlobal(db *leveldb.DB, repo, node, file []byte) {
+func ldbHave(db *leveldb.DB, repo, node []byte) []scanner.File {
+	start := nodeKey(repo, node, nil)                            // before all repo/node files
+	limit := nodeKey(repo, node, []byte{0xff, 0xff, 0xff, 0xff}) // after all repo/node files
+	dbi := db.NewIterator(&util.Range{Start: start, Limit: limit}, nil)
+	var fs []scanner.File
+	for dbi.Next() {
+		var f scanner.File
+		err := f.UnmarshalXDR(dbi.Value())
+		if err != nil {
+			panic(err)
+		}
+		fs = append(fs, f)
+	}
+	return fs
+}
+
+func ldbGlobal(db *leveldb.DB, repo []byte) []scanner.File {
+	start := globalKey(repo, nil)
+	limit := globalKey(repo, []byte{0xff, 0xff, 0xff, 0xff})
+	dbi := db.NewIterator(&util.Range{Start: start, Limit: limit}, nil)
+	var fs []scanner.File
+	for dbi.Next() {
+		var vl versionList
+		err := vl.UnmarshalXDR(dbi.Value())
+		if err != nil {
+			panic(err)
+		}
+		if len(vl.versions) == 0 {
+			l.Debugln(dbi.Key())
+			panic("no versions?")
+		}
+		fk := nodeKey(repo, vl.versions[0].node, globalKeyName(dbi.Key()))
+		bs, err := db.Get(fk, nil)
+		if err != nil {
+			panic(err)
+		}
+
+		var f scanner.File
+		err = f.UnmarshalXDR(bs)
+		if err != nil {
+			panic(err)
+		}
+
+		fs = append(fs, f)
+	}
+	return fs
 }

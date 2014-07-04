@@ -8,9 +8,9 @@ package files
 import (
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type fileRecord struct {
@@ -26,10 +26,10 @@ type Set struct {
 	cMut    sync.Mutex
 
 	repo string
-	db   *bolt.DB
+	db   *leveldb.DB
 }
 
-func NewSet(repo string, db *bolt.DB) *Set {
+func NewSet(repo string, db *leveldb.DB) *Set {
 	var m = Set{
 		repo: repo,
 		db:   db,
@@ -41,18 +41,21 @@ func (m *Set) Replace(node protocol.NodeID, fs []scanner.File) {
 	if debug {
 		l.Debugf("%s Replace(%v, [%d])", m.repo, node, len(fs))
 	}
+	ldbReplace(m.db, []byte(m.repo), node[:], fs)
 }
 
 func (m *Set) ReplaceWithDelete(node protocol.NodeID, fs []scanner.File) {
 	if debug {
 		l.Debugf("%s ReplaceWithDelete(%v, [%d])", m.repo, node, len(fs))
 	}
+	ldbReplaceWithDelete(m.db, []byte(m.repo), node[:], fs)
 }
 
 func (m *Set) Update(node protocol.NodeID, fs []scanner.File) {
 	if debug {
 		l.Debugf("%s Update(%v, [%d])", m.repo, node, len(fs))
 	}
+	ldbUpdate(m.db, []byte(m.repo), node[:], fs)
 }
 
 func (m *Set) Need(node protocol.NodeID) []scanner.File {
@@ -66,16 +69,14 @@ func (m *Set) Have(node protocol.NodeID) []scanner.File {
 	if debug {
 		l.Debugf("%s Have(%v)", m.repo, node)
 	}
-
-	return nil
+	return ldbHave(m.db, []byte(m.repo), node[:])
 }
 
 func (m *Set) Global() []scanner.File {
 	if debug {
 		l.Debugf("%s Global()", m.repo)
 	}
-
-	return nil
+	return ldbGlobal(m.db, []byte(m.repo))
 }
 
 func (m *Set) Get(node protocol.NodeID, file string) scanner.File {
