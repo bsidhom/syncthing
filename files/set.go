@@ -22,7 +22,7 @@ type fileRecord struct {
 type bitset uint64
 
 type Set struct {
-	changes [64]uint64
+	changes map[protocol.NodeID]uint64
 	cMut    sync.RWMutex
 
 	repo string
@@ -31,10 +31,23 @@ type Set struct {
 
 func NewSet(repo string, db *leveldb.DB) *Set {
 	var s = Set{
-		repo: repo,
-		db:   db,
+		changes: make(map[protocol.NodeID]uint64),
+		repo:    repo,
+		db:      db,
 	}
 	return &s
+}
+
+func (s *Set) updateChanges(node protocol.NodeID, fs []scanner.File) {
+	var max uint64
+	for _, f := range fs {
+		if f.Version > max {
+			max = f.Version
+		}
+	}
+	if max > s.changes[node] {
+		s.changes[node] = max
+	}
 }
 
 func (s *Set) Replace(node protocol.NodeID, fs []scanner.File) {
@@ -43,6 +56,7 @@ func (s *Set) Replace(node protocol.NodeID, fs []scanner.File) {
 	}
 	s.cMut.Lock()
 	ldbReplace(s.db, []byte(s.repo), node[:], fs)
+	s.updateChanges(node, fs)
 	s.cMut.Unlock()
 }
 
@@ -52,6 +66,7 @@ func (s *Set) ReplaceWithDelete(node protocol.NodeID, fs []scanner.File) {
 	}
 	s.cMut.Lock()
 	ldbReplaceWithDelete(s.db, []byte(s.repo), node[:], fs)
+	s.updateChanges(node, fs)
 	s.cMut.Unlock()
 }
 
@@ -61,6 +76,7 @@ func (s *Set) Update(node protocol.NodeID, fs []scanner.File) {
 	}
 	s.cMut.Lock()
 	ldbUpdate(s.db, []byte(s.repo), node[:], fs)
+	s.updateChanges(node, fs)
 	s.cMut.Unlock()
 }
 
@@ -110,5 +126,7 @@ func (s *Set) Availability(file string) []protocol.NodeID {
 }
 
 func (s *Set) Changes(node protocol.NodeID) uint64 {
-	return ldbChanges(node[:])
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return s.changes[node]
 }

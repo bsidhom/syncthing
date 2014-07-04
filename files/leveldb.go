@@ -3,7 +3,6 @@ package files
 import (
 	"bytes"
 	"sort"
-	"sync"
 
 	"github.com/calmh/syncthing/lamport"
 	"github.com/calmh/syncthing/protocol"
@@ -40,9 +39,6 @@ func (l fileList) Swap(a, b int) {
 func (l fileList) Less(a, b int) bool {
 	return l[a].Name < l[b].Name
 }
-
-var nodeMaxID = make(map[string]uint64)
-var nodeMaxIDMut sync.Mutex
 
 /*
 
@@ -230,13 +226,6 @@ done:
 	if err != nil {
 		panic(err)
 	}
-
-	ns := string(node) // Not canonical form, but can be used as map index
-	nodeMaxIDMut.Lock()
-	if version > nodeMaxID[ns] {
-		nodeMaxID[ns] = version
-	}
-	nodeMaxIDMut.Unlock()
 }
 
 // ldbRemoveFromGlobal removes the node from the global version list for the
@@ -449,11 +438,4 @@ func ldbNeed(db *leveldb.DB, repo, node []byte) []scanner.File {
 		}
 	}
 	return fs
-}
-
-func ldbChanges(node []byte) uint64 {
-	nodeMaxIDMut.Lock()
-	ver := nodeMaxID[string(node)]
-	nodeMaxIDMut.Unlock()
-	return ver
 }

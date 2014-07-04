@@ -6,7 +6,6 @@ package files_test
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 var (
@@ -51,12 +51,12 @@ func (l fileList) Swap(a, b int) {
 }
 
 func TestGlobalSet(t *testing.T) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	lamport.Default = lamport.Clock{}
+
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 
@@ -196,12 +196,10 @@ func TestGlobalSet(t *testing.T) {
 }
 
 func TestLocalDeleted(t *testing.T) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 	m := files.NewSet("test", db)
 	lamport.Default = lamport.Clock{}
 
@@ -273,12 +271,10 @@ func TestLocalDeleted(t *testing.T) {
 }
 
 func Benchmark10kReplace(b *testing.B) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
 
 	var local []scanner.File
 	for i := 0; i < 10000; i++ {
@@ -298,12 +294,11 @@ func Benchmark10kUpdateChg(b *testing.B) {
 		remote = append(remote, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
+
 	m := files.NewSet("test", db)
 	m.Replace(remoteNode, remote)
 
@@ -331,12 +326,10 @@ func Benchmark10kUpdateSme(b *testing.B) {
 		remote = append(remote, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
 	m := files.NewSet("test", db)
 	m.Replace(remoteNode, remote)
 
@@ -359,12 +352,10 @@ func Benchmark10kNeed2k(b *testing.B) {
 		remote = append(remote, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 	m.Replace(remoteNode, remote)
@@ -394,12 +385,10 @@ func Benchmark10kHave(b *testing.B) {
 		remote = append(remote, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 	m.Replace(remoteNode, remote)
@@ -429,12 +418,10 @@ func Benchmark10kGlobal(b *testing.B) {
 		remote = append(remote, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 	m.Replace(remoteNode, remote)
@@ -459,12 +446,10 @@ func Benchmark10kGlobal(b *testing.B) {
 }
 
 func TestGlobalReset(t *testing.T) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 
@@ -502,12 +487,10 @@ func TestGlobalReset(t *testing.T) {
 }
 
 func TestNeed(t *testing.T) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 
@@ -545,12 +528,10 @@ func TestNeed(t *testing.T) {
 }
 
 func TestChanges(t *testing.T) {
-	os.RemoveAll("testdata/index.db")
-	db, err := leveldb.OpenFile("testdata/index.db", nil)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 
 	m := files.NewSet("test", db)
 
