@@ -354,7 +354,10 @@ nextRepo:
 	// connections to other nodes.
 
 	l.Infoln("Populating repository index")
-	//m.LoadIndexes(confDir)
+	if _, err := os.Stat(filepath.Join(confDir, "idx")); err != nil {
+		// There's no new style index, load old ones
+		m.LoadIndexes(confDir)
+	}
 	m.CleanRepos()
 	m.ScanRepos()
 	m.SaveIndexes(confDir)
