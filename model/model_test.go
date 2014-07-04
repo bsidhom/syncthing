@@ -10,8 +10,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/calmh/syncthing/cid"
 	"github.com/calmh/syncthing/config"
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
@@ -228,27 +226,17 @@ func BenchmarkRequest(b *testing.B) {
 }
 
 func TestActivityMap(t *testing.T) {
-	cm := cid.NewMap()
-	fooID := cm.Get(node1)
-	if fooID == 0 {
-		t.Fatal("ID cannot be zero")
-	}
-	barID := cm.Get(node2)
-	if barID == 0 {
-		t.Fatal("ID cannot be zero")
-	}
-
 	m := make(activityMap)
-	if node := m.leastBusyNode(1<<fooID, cm); node != node1 {
+	if node := m.leastBusyNode([]protocol.NodeID{node1}); node != node1 {
 		t.Errorf("Incorrect least busy node %q", node)
 	}
-	if node := m.leastBusyNode(1<<barID, cm); node != node2 {
+	if node := m.leastBusyNode([]protocol.NodeID{node2}); node != node2 {
 		t.Errorf("Incorrect least busy node %q", node)
 	}
-	if node := m.leastBusyNode(1<<fooID|1<<barID, cm); node != node1 {
+	if node := m.leastBusyNode([]protocol.NodeID{node1, node2}); node != node1 {
 		t.Errorf("Incorrect least busy node %q", node)
 	}
-	if node := m.leastBusyNode(1<<fooID|1<<barID, cm); node != node2 {
+	if node := m.leastBusyNode([]protocol.NodeID{node1, node2}); node != node2 {
 		t.Errorf("Incorrect least busy node %q", node)
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/calmh/syncthing/cid"
 	"github.com/calmh/syncthing/config"
 	"github.com/calmh/syncthing/osutil"
 	"github.com/calmh/syncthing/protocol"
@@ -41,7 +40,7 @@ type openFile struct {
 
 type activityMap map[protocol.NodeID]int
 
-func (m activityMap) leastBusyNode(availability []protocol.NodeID, cm *cid.Map) protocol.NodeID {
+func (m activityMap) leastBusyNode(availability []protocol.NodeID) protocol.NodeID {
 	var low int = 2<<30 - 1
 	var selected protocol.NodeID
 	for _, node := range availability {
@@ -515,7 +514,7 @@ func (p *puller) handleRequestBlock(b bqBlock) bool {
 		panic("bug: request for non-open file")
 	}
 
-	node := p.oustandingPerNode.leastBusyNode(of.availability, p.model.cm)
+	node := p.oustandingPerNode.leastBusyNode(of.availability)
 	if len(node) == 0 {
 		of.err = errNoNode
 		if of.file != nil {
