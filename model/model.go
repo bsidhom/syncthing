@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/calmh/syncthing/cid"
 	"github.com/calmh/syncthing/config"
 	"github.com/calmh/syncthing/files"
@@ -25,6 +24,7 @@ import (
 	"github.com/calmh/syncthing/osutil"
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type repoState int
@@ -45,7 +45,7 @@ const zeroEntrySize = 128
 type Model struct {
 	indexDir string
 	cfg      *config.Configuration
-	db       *bolt.DB
+	db       *leveldb.DB
 
 	clientName    string
 	clientVersion string
@@ -82,7 +82,7 @@ var (
 // where it sends index information to connected peers and responds to requests
 // for file data without altering the local repository in any way.
 func NewModel(indexDir string, cfg *config.Configuration, clientName, clientVersion string) *Model {
-	db, err := bolt.Open(filepath.Join(indexDir, "files.db"), 0640)
+	db, err := leveldb.OpenFile(filepath.Join(indexDir, "idx"), nil)
 	if err != nil {
 		l.Fatalln(err)
 	}
