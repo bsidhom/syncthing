@@ -81,11 +81,7 @@ var (
 // NewModel creates and starts a new model. The model starts in read-only mode,
 // where it sends index information to connected peers and responds to requests
 // for file data without altering the local repository in any way.
-func NewModel(indexDir string, cfg *config.Configuration, clientName, clientVersion string) *Model {
-	db, err := leveldb.OpenFile(filepath.Join(indexDir, "idx"), nil)
-	if err != nil {
-		l.Fatalln(err)
-	}
+func NewModel(indexDir string, cfg *config.Configuration, clientName, clientVersion string, db *leveldb.DB) *Model {
 	m := &Model{
 		indexDir:      indexDir,
 		cfg:           cfg,

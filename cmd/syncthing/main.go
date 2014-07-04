@@ -34,6 +34,7 @@ import (
 	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/upnp"
 	"github.com/juju/ratelimit"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -288,7 +289,11 @@ func main() {
 		rateBucket = ratelimit.NewBucketWithRate(float64(1000*cfg.Options.MaxSendKbps), int64(5*1000*cfg.Options.MaxSendKbps))
 	}
 
-	m := model.NewModel(confDir, &cfg, "syncthing", Version)
+	db, err := leveldb.OpenFile(filepath.Join(confDir, "idx"), nil)
+	if err != nil {
+		l.Fatalln("leveldb.OpenFile():", err)
+	}
+	m := model.NewModel(confDir, &cfg, "syncthing", Version, db)
 
 nextRepo:
 	for i, repo := range cfg.Repositories {
