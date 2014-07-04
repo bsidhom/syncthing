@@ -18,6 +18,10 @@ import (
 	"github.com/calmh/syncthing/scanner"
 )
 
+var (
+	remoteNode = protocol.NodeID{1, 2, 3}
+)
+
 func genBlocks(n int) []scanner.Block {
 	b := make([]scanner.Block, n)
 	for i := range b {
@@ -111,10 +115,10 @@ func TestGlobalSet(t *testing.T) {
 		local0[3],
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local0)
-	m.ReplaceWithDelete(cid.LocalID, local1)
-	m.Replace(1, remote0)
-	m.Update(1, remote1)
+	m.ReplaceWithDelete(cid.LocalNodeID, local0)
+	m.ReplaceWithDelete(cid.LocalNodeID, local1)
+	m.Replace(remoteNode, remote0)
+	m.Update(remoteNode, remote1)
 
 	g := m.Global()
 	sort.Sort(fileList(g))
@@ -123,40 +127,40 @@ func TestGlobalSet(t *testing.T) {
 		t.Errorf("Global incorrect;\n A: %v !=\n E: %v", g, expectedGlobal)
 	}
 
-	h := m.Have(cid.LocalID)
+	h := m.Have(cid.LocalNodeID)
 	sort.Sort(fileList(h))
 
 	if fmt.Sprint(h) != fmt.Sprint(localTot) {
 		t.Errorf("Have incorrect;\n A: %v !=\n E: %v", h, localTot)
 	}
 
-	h = m.Have(1)
+	h = m.Have(remoteNode)
 	sort.Sort(fileList(h))
 
 	if fmt.Sprint(h) != fmt.Sprint(remoteTot) {
 		t.Errorf("Have incorrect;\n A: %v !=\n E: %v", h, remoteTot)
 	}
 
-	n := m.Need(cid.LocalID)
+	n := m.Need(cid.LocalNodeID)
 	sort.Sort(fileList(n))
 
 	if fmt.Sprint(n) != fmt.Sprint(expectedLocalNeed) {
 		t.Errorf("Need incorrect;\n A: %v !=\n E: %v", n, expectedLocalNeed)
 	}
 
-	n = m.Need(1)
+	n = m.Need(remoteNode)
 	sort.Sort(fileList(n))
 
 	if fmt.Sprint(n) != fmt.Sprint(expectedRemoteNeed) {
 		t.Errorf("Need incorrect;\n A: %v !=\n E: %v", n, expectedRemoteNeed)
 	}
 
-	f := m.Get(cid.LocalID, "b")
+	f := m.Get(cid.LocalNodeID, "b")
 	if fmt.Sprint(f) != fmt.Sprint(localTot[1]) {
 		t.Errorf("Get incorrect;\n A: %v !=\n E: %v", f, localTot[1])
 	}
 
-	f = m.Get(1, "b")
+	f = m.Get(remoteNode, "b")
 	if fmt.Sprint(f) != fmt.Sprint(remote1[0]) {
 		t.Errorf("Get incorrect;\n A: %v !=\n E: %v", f, remote1[0])
 	}
@@ -198,22 +202,22 @@ func TestLocalDeleted(t *testing.T) {
 		scanner.File{Name: "z", Version: 1000, Flags: protocol.FlagDirectory},
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local1)
+	m.ReplaceWithDelete(cid.LocalNodeID, local1)
 
-	m.ReplaceWithDelete(cid.LocalID, []scanner.File{
+	m.ReplaceWithDelete(cid.LocalNodeID, []scanner.File{
 		local1[0],
 		// [1] removed
 		local1[2],
 		local1[3],
 		local1[4],
 	})
-	m.ReplaceWithDelete(cid.LocalID, []scanner.File{
+	m.ReplaceWithDelete(cid.LocalNodeID, []scanner.File{
 		local1[0],
 		local1[2],
 		// [3] removed
 		local1[4],
 	})
-	m.ReplaceWithDelete(cid.LocalID, []scanner.File{
+	m.ReplaceWithDelete(cid.LocalNodeID, []scanner.File{
 		local1[0],
 		local1[2],
 		// [4] removed
@@ -235,7 +239,7 @@ func TestLocalDeleted(t *testing.T) {
 		t.Errorf("Global incorrect;\n A: %v !=\n E: %v", g, expectedGlobal1)
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, []scanner.File{
+	m.ReplaceWithDelete(cid.LocalNodeID, []scanner.File{
 		local1[0],
 		// [2] removed
 	})
@@ -273,7 +277,7 @@ func Benchmark10kReplace(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m := files.NewSet("test", db)
-		m.ReplaceWithDelete(cid.LocalID, local)
+		m.ReplaceWithDelete(cid.LocalNodeID, local)
 	}
 }
 
@@ -290,14 +294,14 @@ func Benchmark10kUpdateChg(b *testing.B) {
 	}
 	defer db.Close()
 	m := files.NewSet("test", db)
-	m.Replace(1, remote)
+	m.Replace(remoteNode, remote)
 
 	var local []scanner.File
 	for i := 0; i < 10000; i++ {
 		local = append(local, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -306,7 +310,7 @@ func Benchmark10kUpdateChg(b *testing.B) {
 			local[j].Version++
 		}
 		b.StartTimer()
-		m.Update(cid.LocalID, local)
+		m.Update(cid.LocalNodeID, local)
 	}
 }
 
@@ -323,18 +327,18 @@ func Benchmark10kUpdateSme(b *testing.B) {
 	}
 	defer db.Close()
 	m := files.NewSet("test", db)
-	m.Replace(1, remote)
+	m.Replace(remoteNode, remote)
 
 	var local []scanner.File
 	for i := 0; i < 10000; i++ {
 		local = append(local, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 1000})
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m.Update(cid.LocalID, local)
+		m.Update(cid.LocalNodeID, local)
 	}
 }
 
@@ -352,7 +356,7 @@ func Benchmark10kNeed2k(b *testing.B) {
 	defer db.Close()
 
 	m := files.NewSet("test", db)
-	m.Replace(cid.LocalID+1, remote)
+	m.Replace(remoteNode, remote)
 
 	var local []scanner.File
 	for i := 0; i < 8000; i++ {
@@ -362,11 +366,11 @@ func Benchmark10kNeed2k(b *testing.B) {
 		local = append(local, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 980})
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		fs := m.Need(cid.LocalID)
+		fs := m.Need(cid.LocalNodeID)
 		if l := len(fs); l != 2000 {
 			b.Errorf("wrong length %d != 2k", l)
 		}
@@ -387,7 +391,7 @@ func Benchmark10kHave(b *testing.B) {
 	defer db.Close()
 
 	m := files.NewSet("test", db)
-	m.Replace(cid.LocalID+1, remote)
+	m.Replace(remoteNode, remote)
 
 	var local []scanner.File
 	for i := 0; i < 2000; i++ {
@@ -397,11 +401,11 @@ func Benchmark10kHave(b *testing.B) {
 		local = append(local, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 980})
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		fs := m.Have(cid.LocalID)
+		fs := m.Have(cid.LocalNodeID)
 		if l := len(fs); l != 10000 {
 			b.Errorf("wrong length %d != 10k", l)
 		}
@@ -422,7 +426,7 @@ func Benchmark10kGlobal(b *testing.B) {
 	defer db.Close()
 
 	m := files.NewSet("test", db)
-	m.Replace(cid.LocalID+1, remote)
+	m.Replace(remoteNode, remote)
 
 	var local []scanner.File
 	for i := 0; i < 2000; i++ {
@@ -432,7 +436,7 @@ func Benchmark10kGlobal(b *testing.B) {
 		local = append(local, scanner.File{Name: fmt.Sprintf("file%d", i), Version: 980})
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -467,7 +471,7 @@ func TestGlobalReset(t *testing.T) {
 		scanner.File{Name: "e", Version: 1000},
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
 	g := m.Global()
 	sort.Sort(fileList(g))
 
@@ -475,8 +479,8 @@ func TestGlobalReset(t *testing.T) {
 		t.Errorf("Global incorrect;\n%v !=\n%v", g, local)
 	}
 
-	m.Replace(1, remote)
-	m.Replace(1, nil)
+	m.Replace(remoteNode, remote)
+	m.Replace(remoteNode, nil)
 
 	g = m.Global()
 	sort.Sort(fileList(g))
@@ -516,10 +520,10 @@ func TestNeed(t *testing.T) {
 		scanner.File{Name: "e", Version: 1000},
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local)
-	m.Replace(1, remote)
+	m.ReplaceWithDelete(cid.LocalNodeID, local)
+	m.Replace(remoteNode, remote)
 
-	need := m.Need(0)
+	need := m.Need(cid.LocalNodeID)
 
 	sort.Sort(fileList(need))
 	sort.Sort(fileList(shouldNeed))
@@ -554,17 +558,17 @@ func TestChanges(t *testing.T) {
 		scanner.File{Name: "e", Version: 1000},
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local1)
-	c0 := m.Changes(cid.LocalID)
+	m.ReplaceWithDelete(cid.LocalNodeID, local1)
+	c0 := m.Changes(cid.LocalNodeID)
 
-	m.ReplaceWithDelete(cid.LocalID, local2)
-	c1 := m.Changes(cid.LocalID)
+	m.ReplaceWithDelete(cid.LocalNodeID, local2)
+	c1 := m.Changes(cid.LocalNodeID)
 	if !(c1 > c0) {
 		t.Fatal("Change number should have incremented")
 	}
 
-	m.ReplaceWithDelete(cid.LocalID, local2)
-	c2 := m.Changes(cid.LocalID)
+	m.ReplaceWithDelete(cid.LocalNodeID, local2)
+	c2 := m.Changes(cid.LocalNodeID)
 	if c2 != c1 {
 		t.Fatal("Change number should be unchanged")
 	}

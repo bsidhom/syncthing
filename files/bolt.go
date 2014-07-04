@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/calmh/syncthing/protocol"
 	"github.com/calmh/syncthing/scanner"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -17,7 +16,11 @@ const (
 
 type fileVersion struct {
 	version uint64
-	node    protocol.NodeID
+	node    []byte
+}
+
+type versionList struct {
+	versions []fileVersion
 }
 
 type fileList []scanner.File
@@ -122,6 +125,35 @@ func ldbReplace(db *leveldb.DB, repo, node []byte, fs []scanner.File) {
 // file. If the node is already present in the list, the version is updated.
 // If the file does not have an entry in the global list, it is created.
 func ldbUpdateGlobal(db *leveldb.DB, repo, node, file []byte, version uint64) {
+	gk := globalKey(repo, file)
+	svl, err := db.Get(gk, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	var fl versionList
+	err = fl.UnmarshalXDR(svl)
+	if err != nil {
+		panic(err)
+	}
+
+	for i := range fl.versions {
+		if bytes.Compare(fl.versions[i].node, node) == 0 {
+			fl.versions[i].version = version
+			goto save
+		}
+	}
+
+	fl.versions = append(fl.versions, fileVersion{
+		node:    node,
+		version: version,
+	})
+
+save:
+	err = db.Put(gk, fl.MarshalXDR(), nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // ldbRemoveFromGlobal removes the node from the global version list for the
