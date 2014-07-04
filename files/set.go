@@ -23,74 +23,92 @@ type bitset uint64
 
 type Set struct {
 	changes [64]uint64
-	cMut    sync.Mutex
+	cMut    sync.RWMutex
 
 	repo string
 	db   *leveldb.DB
 }
 
 func NewSet(repo string, db *leveldb.DB) *Set {
-	var m = Set{
+	var s = Set{
 		repo: repo,
 		db:   db,
 	}
-	return &m
+	return &s
 }
 
-func (m *Set) Replace(node protocol.NodeID, fs []scanner.File) {
+func (s *Set) Replace(node protocol.NodeID, fs []scanner.File) {
 	if debug {
-		l.Debugf("%s Replace(%v, [%d])", m.repo, node, len(fs))
+		l.Debugf("%s Replace(%v, [%d])", s.repo, node, len(fs))
 	}
-	ldbReplace(m.db, []byte(m.repo), node[:], fs)
+	s.cMut.Lock()
+	ldbReplace(s.db, []byte(s.repo), node[:], fs)
+	s.cMut.Unlock()
 }
 
-func (m *Set) ReplaceWithDelete(node protocol.NodeID, fs []scanner.File) {
+func (s *Set) ReplaceWithDelete(node protocol.NodeID, fs []scanner.File) {
 	if debug {
-		l.Debugf("%s ReplaceWithDelete(%v, [%d])", m.repo, node, len(fs))
+		l.Debugf("%s ReplaceWithDelete(%v, [%d])", s.repo, node, len(fs))
 	}
-	ldbReplaceWithDelete(m.db, []byte(m.repo), node[:], fs)
+	s.cMut.Lock()
+	ldbReplaceWithDelete(s.db, []byte(s.repo), node[:], fs)
+	s.cMut.Unlock()
 }
 
-func (m *Set) Update(node protocol.NodeID, fs []scanner.File) {
+func (s *Set) Update(node protocol.NodeID, fs []scanner.File) {
 	if debug {
-		l.Debugf("%s Update(%v, [%d])", m.repo, node, len(fs))
+		l.Debugf("%s Update(%v, [%d])", s.repo, node, len(fs))
 	}
-	ldbUpdate(m.db, []byte(m.repo), node[:], fs)
+	s.cMut.Lock()
+	ldbUpdate(s.db, []byte(s.repo), node[:], fs)
+	s.cMut.Unlock()
 }
 
-func (m *Set) Need(node protocol.NodeID) []scanner.File {
+func (s *Set) Need(node protocol.NodeID) []scanner.File {
 	if debug {
-		l.Debugf("%s Need(%v)", m.repo, node)
+		l.Debugf("%s Need(%v)", s.repo, node)
 	}
-	return ldbNeed(m.db, []byte(m.repo), node[:])
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbNeed(s.db, []byte(s.repo), node[:])
 }
 
-func (m *Set) Have(node protocol.NodeID) []scanner.File {
+func (s *Set) Have(node protocol.NodeID) []scanner.File {
 	if debug {
-		l.Debugf("%s Have(%v)", m.repo, node)
+		l.Debugf("%s Have(%v)", s.repo, node)
 	}
-	return ldbHave(m.db, []byte(m.repo), node[:])
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbHave(s.db, []byte(s.repo), node[:])
 }
 
-func (m *Set) Global() []scanner.File {
+func (s *Set) Global() []scanner.File {
 	if debug {
-		l.Debugf("%s Global()", m.repo)
+		l.Debugf("%s Global()", s.repo)
 	}
-	return ldbGlobal(m.db, []byte(m.repo))
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbGlobal(s.db, []byte(s.repo))
 }
 
-func (m *Set) Get(node protocol.NodeID, file string) scanner.File {
-	return ldbGet(m.db, []byte(m.repo), node[:], []byte(file))
+func (s *Set) Get(node protocol.NodeID, file string) scanner.File {
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbGet(s.db, []byte(s.repo), node[:], []byte(file))
 }
 
-func (m *Set) GetGlobal(file string) scanner.File {
-	return ldbGetGlobal(m.db, []byte(m.repo), []byte(file))
+func (s *Set) GetGlobal(file string) scanner.File {
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbGetGlobal(s.db, []byte(s.repo), []byte(file))
 }
 
-func (m *Set) Availability(file string) []protocol.NodeID {
-	return ldbAvailability(m.db, []byte(m.repo), []byte(file))
+func (s *Set) Availability(file string) []protocol.NodeID {
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	return ldbAvailability(s.db, []byte(s.repo), []byte(file))
 }
 
-func (m *Set) Changes(node protocol.NodeID) uint64 {
+func (s *Set) Changes(node protocol.NodeID) uint64 {
 	return ldbChanges(node[:])
 }
