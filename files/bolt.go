@@ -291,6 +291,9 @@ func ldbHave(db *leveldb.DB, repo, node []byte) []scanner.File {
 func ldbGet(db *leveldb.DB, repo, node, file []byte) scanner.File {
 	nk := nodeKey(repo, node, file)
 	bs, err := db.Get(nk, nil)
+	if err == leveldb.ErrNotFound {
+		return scanner.File{}
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -306,6 +309,9 @@ func ldbGet(db *leveldb.DB, repo, node, file []byte) scanner.File {
 func ldbGetGlobal(db *leveldb.DB, repo, file []byte) scanner.File {
 	k := globalKey(repo, file)
 	bs, err := db.Get(k, nil)
+	if err == leveldb.ErrNotFound {
+		return scanner.File{}
+	}
 	if err != nil {
 		panic(err)
 	}

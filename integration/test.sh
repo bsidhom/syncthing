@@ -131,7 +131,7 @@ alterFiles() {
 	pkill -CONT syncthing
 }
 
-rm -f h?/*.idx.gz h?/files.db
+rm -rf h?/*.idx.gz h?/idx
 rm -rf s? s??-? s4d
 
 echo "Setting up files..."

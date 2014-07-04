@@ -170,6 +170,16 @@ func TestGlobalSet(t *testing.T) {
 		t.Errorf("GetGlobal incorrect;\n A: %v !=\n E: %v", f, remote1[0])
 	}
 
+	f = m.Get(cid.LocalNodeID, "zz")
+	if f.Name != "" {
+		t.Errorf("Get incorrect;\n A: %v !=\n E: %v", f, scanner.File{})
+	}
+
+	f = m.GetGlobal("zz")
+	if f.Name != "" {
+		t.Errorf("GetGlobal incorrect;\n A: %v !=\n E: %v", f, scanner.File{})
+	}
+
 	av := []protocol.NodeID{cid.LocalNodeID, remoteNode}
 	a := m.Availability("a")
 	if !(len(a) == 2 && (a[0] == av[0] && a[1] == av[1] || a[0] == av[1] && a[1] == av[0])) {
