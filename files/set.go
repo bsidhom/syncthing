@@ -80,20 +80,17 @@ func (m *Set) Global() []scanner.File {
 }
 
 func (m *Set) Get(node protocol.NodeID, file string) scanner.File {
-	var f scanner.File
-	return f
+	return ldbGet(m.db, []byte(m.repo), node[:], []byte(file))
 }
 
 func (m *Set) GetGlobal(file string) scanner.File {
-	var f scanner.File
-	return f
+	return ldbGetGlobal(m.db, []byte(m.repo), []byte(file))
 }
 
-func (m *Set) Availability(name string) bitset {
-	var av bitset
-	return av
+func (m *Set) Availability(file string) []protocol.NodeID {
+	return ldbAvailability(m.db, []byte(m.repo), []byte(file))
 }
 
 func (m *Set) Changes(node protocol.NodeID) uint64 {
-	return 0
+	return ldbChanges(node[:])
 }

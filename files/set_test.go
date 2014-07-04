@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+
 	"github.com/calmh/syncthing/cid"
 	"github.com/calmh/syncthing/files"
 	"github.com/calmh/syncthing/lamport"
@@ -169,17 +170,18 @@ func TestGlobalSet(t *testing.T) {
 		t.Errorf("GetGlobal incorrect;\n A: %v !=\n E: %v", f, remote1[0])
 	}
 
-	a := int(m.Availability("a"))
-	if av := 1<<0 + 1<<1; a != av {
+	av := []protocol.NodeID{cid.LocalNodeID, remoteNode}
+	a := m.Availability("a")
+	if !(len(a) == 2 && (a[0] == av[0] && a[1] == av[1] || a[0] == av[1] && a[1] == av[0])) {
 		t.Errorf("Availability incorrect;\n A: %v !=\n E: %v", a, av)
 	}
-	a = int(m.Availability("b"))
-	if av := 1 << 1; a != av {
-		t.Errorf("Availability incorrect;\n A: %v !=\n E: %v", a, av)
+	a = m.Availability("b")
+	if len(a) != 1 || a[0] != remoteNode {
+		t.Errorf("Availability incorrect;\n A: %v !=\n E: %v", a, remoteNode)
 	}
-	a = int(m.Availability("d"))
-	if av := 1 << 0; a != av {
-		t.Errorf("Availability incorrect;\n A: %v !=\n E: %v", a, av)
+	a = m.Availability("d")
+	if len(a) != 1 || a[0] != cid.LocalNodeID {
+		t.Errorf("Availability incorrect;\n A: %v !=\n E: %v", a, cid.LocalNodeID)
 	}
 }
 
