@@ -23,6 +23,7 @@ type Discoverer struct {
 	listenAddrs      []string
 	localBcastIntv   time.Duration
 	globalBcastIntv  time.Duration
+	errorRetryIntv   time.Duration
 	beacon           *beacon.Beacon
 	registry         map[protocol.NodeID][]string
 	registryLock     sync.RWMutex
@@ -53,6 +54,7 @@ func NewDiscoverer(id protocol.NodeID, addresses []string, localPort int) (*Disc
 		listenAddrs:     addresses,
 		localBcastIntv:  30 * time.Second,
 		globalBcastIntv: 1800 * time.Second,
+		errorRetryIntv:  60 * time.Second,
 		beacon:          b,
 		registry:        make(map[protocol.NodeID][]string),
 	}
@@ -173,19 +175,18 @@ func (d *Discoverer) sendLocalAnnouncements() {
 
 func (d *Discoverer) sendExternalAnnouncements() {
 	// this should go in the Discoverer struct
-	errorRetryIntv := 60 * time.Second
 
 	remote, err := net.ResolveUDPAddr("udp", d.extServer)
 	for err != nil {
-		l.Warnf("Global discovery: %v; trying again in %v", err, errorRetryIntv)
-		time.Sleep(errorRetryIntv)
+		l.Warnf("Global discovery: %v; trying again in %v", err, d.errorRetryIntv)
+		time.Sleep(d.errorRetryIntv)
 		remote, err = net.ResolveUDPAddr("udp", d.extServer)
 	}
 
 	conn, err := net.ListenUDP("udp", nil)
 	for err != nil {
-		l.Warnf("Global discovery: %v; trying again in %v", err, errorRetryIntv)
-		time.Sleep(errorRetryIntv)
+		l.Warnf("Global discovery: %v; trying again in %v", err, d.errorRetryIntv)
+		time.Sleep(d.errorRetryIntv)
 		conn, err = net.ListenUDP("udp", nil)
 	}
 
@@ -231,7 +232,7 @@ func (d *Discoverer) sendExternalAnnouncements() {
 		if ok {
 			time.Sleep(d.globalBcastIntv)
 		} else {
-			time.Sleep(errorRetryIntv)
+			time.Sleep(d.errorRetryIntv)
 		}
 	}
 }
